@@ -37,10 +37,10 @@ func main() {
 
 	// Добавляем CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000",       // Разрешаем запросы только с этого домена
+		AllowOrigins:     "*",                           // Разрешаем запросы только с этого домена
 		AllowMethods:     "GET, POST, PUT, DELETE",      // Разрешенные методы
 		AllowHeaders:     "Content-Type, Authorization", // Разрешенные заголовки
-		AllowCredentials: true,                          // Разрешаем передачу куки и авторизационных заголовков
+		AllowCredentials: false,                         // Разрешаем передачу куки и авторизационных заголовков
 	}))
 
 	// Routes
