@@ -36,6 +36,8 @@ func Register(username, email, password string, db *sql.DB) error {
 
 func Login(email, password, jwtSecret string, db *sql.DB) (string, error) {
 	var user models.User
+
+	email = strings.ToLower(email)
 	err := db.QueryRow("SELECT id, password_hash FROM users WHERE email = $1", email).Scan(&user.ID, &user.PasswordHash)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("err login email: %s, err: %w", email, err))

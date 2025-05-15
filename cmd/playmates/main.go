@@ -57,7 +57,7 @@ func main() {
 		}
 
 		if err := repository.Register(req.Username, req.Email, req.Password, db); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Error creating a new user. Perhaps such an Email or Username is already in use."})
 		}
 
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "user registered"})

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	"playmates/components/service/models"
+	"strings"
 )
 
 func GetUser(id int, db *sql.DB) (models.User, error) {
@@ -36,6 +37,10 @@ func GetUser(id int, db *sql.DB) (models.User, error) {
 }
 
 func SetUser(user models.User, db *sql.DB) error {
+	for i := range user.Games {
+		user.Games[i] = strings.ToLower(user.Games[i])
+	}
+
 	_, err := db.Exec(
 		`UPDATE users SET age = $1, gender = $2, games = $3, about_me = $4 WHERE id = $5`,
 		user.Age, user.Gender, pq.Array(user.Games), user.AboutMe, user.ID,
@@ -50,6 +55,17 @@ func SetUser(user models.User, db *sql.DB) error {
 }
 
 func SearchUsers(minAge, maxAge, offset int, games []string, gender string, db *sql.DB) ([]models.User, int, error) {
+
+	/*	fmt.Println(games)
+		for i := range games {
+			fmt.Println(games[i])
+		}
+	*/
+
+	for i, _ := range games {
+		games[i] = strings.ToLower(games[i])
+	}
+	fmt.Println(games)
 	query := "SELECT id, username, email, age, gender, games, about_me FROM users WHERE 1=1"
 	args := []interface{}{}
 
