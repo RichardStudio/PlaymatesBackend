@@ -10,6 +10,14 @@ type Message struct {
 	Time       time.Time `json:"time"`
 }
 
+type MessageDB struct {
+	ID         int
+	SenderID   int
+	ReceiverID int
+	Msg        []byte
+	Time       time.Time
+}
+
 type ChatPreview struct {
 	LastMessageID   int       `json:"last_message_id"`
 	SenderID        int       `json:"sender_id"`
@@ -18,4 +26,14 @@ type ChatPreview struct {
 	LastMessageTime time.Time `json:"last_message_time"`
 	OtherUserID     int       `json:"other_user_id"`
 	OtherUsername   string    `json:"other_username"`
+}
+
+type ChatPreviewDB struct {
+	LastMessageID   int
+	SenderID        int
+	ReceiverID      int
+	LastMessage     []byte
+	LastMessageTime time.Time
+	OtherUserID     int
+	OtherUsername   string
 }

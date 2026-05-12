@@ -1,17 +1,16 @@
 package repository
 
 import (
-	"database/sql"
 	"fmt"
-	"playmates/components/service/models"
+	"playmates/components/playmates/models"
 )
 
-func PostMessage(message string, senderID, receiverID int, db *sql.DB) error {
+func (r *Repository) PostMessage(message string, senderID, receiverID int) error {
 	query := `
         INSERT INTO messages (sender_id, receiver_id, message)
         VALUES ($1, $2, $3)
     `
-	_, err := db.Exec(query, senderID, receiverID, message)
+	_, err := r.db.Exec(query, senderID, receiverID, message)
 	if err != nil {
 		return fmt.Errorf("error while inserting message into the database: %w", err)
 	}
@@ -19,22 +18,22 @@ func PostMessage(message string, senderID, receiverID int, db *sql.DB) error {
 	return nil
 }
 
-func GetMessages(currentUserID, otherUserID int, db *sql.DB) ([]models.Message, error) {
+func (r *Repository) GetMessages(currentUserID, otherUserID int) ([]models.MessageDB, error) {
 	query := `
         SELECT sender_id, message, created_at
         FROM messages
         WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
         ORDER BY created_at ASC
     `
-	rows, err := db.Query(query, currentUserID, otherUserID)
+	rows, err := r.db.Query(query, currentUserID, otherUserID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting messages from the database: %w", err)
 	}
 	defer rows.Close()
 
-	var messages []models.Message
+	var messages []models.MessageDB
 	for rows.Next() {
-		var msg models.Message
+		var msg models.MessageDB
 		err := rows.Scan(&msg.SenderID, &msg.Msg, &msg.Time)
 		if err != nil {
 			return nil, fmt.Errorf("error while scanning rows: %w", err)
@@ -45,7 +44,7 @@ func GetMessages(currentUserID, otherUserID int, db *sql.DB) ([]models.Message, 
 	return messages, nil
 }
 
-func GetUserChats(userID int, db *sql.DB) ([]models.ChatPreview, error) {
+func (r *Repository) GetUserChats(userID int) ([]models.ChatPreviewDB, error) {
 	query := `
         SELECT DISTINCT ON (other_user_id)
             m.id AS message_id,
@@ -67,15 +66,15 @@ func GetUserChats(userID int, db *sql.DB) ([]models.ChatPreview, error) {
         ORDER BY other_user_id, m.created_at DESC
     `
 
-	rows, err := db.Query(query, userID)
+	rows, err := r.db.Query(query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting user chats: %w", err)
 	}
 	defer rows.Close()
 
-	var chats []models.ChatPreview
+	var chats []models.ChatPreviewDB
 	for rows.Next() {
-		var chat models.ChatPreview
+		var chat models.ChatPreviewDB
 		err := rows.Scan(
 			&chat.LastMessageID,
 			&chat.SenderID,

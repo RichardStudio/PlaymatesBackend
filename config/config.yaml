@@ -1,2 +1,2 @@
-db_conn_str: "postgres://nikita:nikita12345@localhost:5432/Playmates?sslmode=disable"
+db_conn_str: "-"
 jwt_secret: "-"

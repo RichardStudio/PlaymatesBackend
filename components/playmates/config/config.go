@@ -2,12 +2,14 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/ilyakaznacheev/cleanenv"
 )
 
 type Config struct {
-	DbConnStr string `yaml:"db_conn_str"`
-	JwtSecret string `yaml:"jwt_secret"`
+	DbConnStr    string `yaml:"db_conn_str"`
+	JwtSecret    string `yaml:"jwt_secret"`
+	SealerSecret string `yaml:"sealer_secret"`
 }
 
 func New(path string) (*Config, error) {

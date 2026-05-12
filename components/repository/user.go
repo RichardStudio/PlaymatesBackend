@@ -3,18 +3,19 @@ package repository
 import (
 	"database/sql"
 	"fmt"
-	"github.com/lib/pq"
-	"playmates/components/service/models"
+	"playmates/components/playmates/models"
 	"strings"
+
+	"github.com/lib/pq"
 )
 
-func GetUser(id int, db *sql.DB) (models.User, error) {
+func (r *Repository) GetUser(id int) (models.User, error) {
 	var user models.User
 	var age sql.NullInt64
 	var gender sql.NullString
 	var aboutMe sql.NullString
 
-	err := db.QueryRow("SELECT id, username, email, age, gender, games, about_me FROM users WHERE id = $1", id).Scan(
+	err := r.db.QueryRow("SELECT id, username, email, age, gender, games, about_me FROM users WHERE id = $1", id).Scan(
 		&user.ID, &user.Username, &user.Email, &age, &gender, pq.Array(&user.Games), &aboutMe,
 	)
 
@@ -36,12 +37,12 @@ func GetUser(id int, db *sql.DB) (models.User, error) {
 	return user, nil
 }
 
-func SetUser(user models.User, db *sql.DB) error {
+func (r *Repository) SetUser(user models.User) error {
 	for i := range user.Games {
 		user.Games[i] = strings.ToLower(user.Games[i])
 	}
 
-	_, err := db.Exec(
+	_, err := r.db.Exec(
 		`UPDATE users SET age = $1, gender = $2, games = $3, about_me = $4 WHERE id = $5`,
 		user.Age, user.Gender, pq.Array(user.Games), user.AboutMe, user.ID,
 	)
@@ -54,18 +55,7 @@ func SetUser(user models.User, db *sql.DB) error {
 	return nil
 }
 
-func SearchUsers(minAge, maxAge, offset int, games []string, gender string, db *sql.DB) ([]models.User, int, error) {
-
-	/*	fmt.Println(games)
-		for i := range games {
-			fmt.Println(games[i])
-		}
-	*/
-
-	for i, _ := range games {
-		games[i] = strings.ToLower(games[i])
-	}
-	fmt.Println(games)
+func (r *Repository) SearchUsers(minAge, maxAge, offset int, games []string, gender string) ([]models.User, int, error) {
 	query := "SELECT id, username, email, age, gender, games, about_me FROM users WHERE 1=1"
 	args := []interface{}{}
 
@@ -95,7 +85,7 @@ func SearchUsers(minAge, maxAge, offset int, games []string, gender string, db *
 		}
 	}
 
-	total, err := CountSearch(minAge, maxAge, games, gender, db)
+	total, err := r.CountSearch(minAge, maxAge, games, gender)
 	if err != nil {
 		return nil, -1, fmt.Errorf("failed to count users: %w", err)
 	}
@@ -104,7 +94,7 @@ func SearchUsers(minAge, maxAge, offset int, games []string, gender string, db *
 	query += fmt.Sprintf(" LIMIT 20 OFFSET $%d", len(args)+1)
 	args = append(args, offset)
 
-	rows, err := db.Query(query, args...)
+	rows, err := r.db.Query(query, args...)
 	if err != nil {
 		fmt.Println(fmt.Sprintf("failed to execute query search: %v", err))
 		return nil, -1, fmt.Errorf("failed to execute query for search users: %w", err)
@@ -142,7 +132,7 @@ func SearchUsers(minAge, maxAge, offset int, games []string, gender string, db *
 	return users, total, nil
 }
 
-func CountSearch(minAge, maxAge int, games []string, gender string, db *sql.DB) (int, error) {
+func (r *Repository) CountSearch(minAge, maxAge int, games []string, gender string) (int, error) {
 	query := "SELECT COUNT(*) FROM users WHERE 1=1"
 	args := []interface{}{}
 
@@ -173,7 +163,7 @@ func CountSearch(minAge, maxAge int, games []string, gender string, db *sql.DB) 
 	}
 
 	var total int
-	err := db.QueryRow(query, args...).Scan(&total)
+	err := r.db.QueryRow(query, args...).Scan(&total)
 	if err != nil {
 		return -1, fmt.Errorf("failed to execute query count: %w", err)
 	}
