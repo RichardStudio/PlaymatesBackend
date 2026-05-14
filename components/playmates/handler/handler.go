@@ -58,7 +58,8 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
 	}
 
-	token, err := h.service.Login(req.Email, req.Password)
+	fingerprint := getFingerprint(c)
+	token, refresh, refreshExpires, err := h.service.Login(req.Email, req.Password, fingerprint)
 	if err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -71,6 +72,18 @@ func (h *Handler) Login(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:        "refresh_token",
+		Value:       refresh,
+		Path:        "/refresh",
+		Expires:     refreshExpires,
+		Secure:      false,
+		HTTPOnly:    true,
+		SameSite:    "Strict",
+		SessionOnly: false,
+	})
+
 	return c.JSON(fiber.Map{
 		"token": token,
 		"user":  user,
@@ -251,4 +264,44 @@ func (h *Handler) GetMessages(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"chats": chats})
+}
+
+func getFingerprint(c *fiber.Ctx) string {
+	ip := c.IP()
+	agent := c.Get("User-Agent")
+
+	return fmt.Sprintf("%s|%s", ip, agent)
+}
+
+func (h *Handler) Refresh(c *fiber.Ctx) error {
+	refToken := c.Cookies("refresh_token")
+	if refToken == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "no refresh token"})
+	}
+
+	fingerprint := getFingerprint(c)
+
+	ok, accessToken, newRefToken, expiresAt, err := h.service.Refresh(refToken, fingerprint)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{})
+	}
+
+	c.Cookie(&fiber.Cookie{
+		Name:        "refresh_token",
+		Value:       newRefToken,
+		Path:        "/refresh",
+		Expires:     expiresAt,
+		Secure:      false,
+		HTTPOnly:    true,
+		SameSite:    "Strict",
+		SessionOnly: false,
+	})
+
+	return c.JSON(fiber.Map{
+		"token": accessToken,
+	})
 }

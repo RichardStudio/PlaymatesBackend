@@ -1,7 +1,10 @@
 package service
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -39,7 +42,7 @@ func (s *Service) GetIdFromToken(tokenString string) (int, error) {
 	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.jwtSecret), nil
-	})
+	}, jwt.WithValidMethods([]string{"HS256"}))
 	if err != nil {
 		return -1, fmt.Errorf("failed to parse token: %w", err)
 	}
@@ -124,17 +127,30 @@ func (s *Service) Register(username, email, password string) error {
 	return err
 }
 
-func (s *Service) Login(email, password string) (string, error) {
+func (s *Service) Login(email, password, fingerprint string) (string, string, time.Time, error) {
 	email = strings.ToLower(email)
 
 	user, err := s.repo.Login(email)
 	if err != nil {
 		log.Printf("err login email: %s, err: %w\n", email, err)
-		return "", fmt.Errorf("invalid email or password")
+		return "", "", time.Time{}, fmt.Errorf("invalid email or password")
 	}
 
 	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return "", fmt.Errorf("invalid email or password")
+		return "", "", time.Time{}, fmt.Errorf("invalid email or password")
+	}
+
+	rawRefreshToken, err := generateRefreshToken()
+	if err != nil {
+		return "", "", time.Time{}, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	hashedRefresh := hash(rawRefreshToken)
+	expiresAt := time.Now().Add(time.Hour * 24 * 7)
+
+	err = s.repo.InsertToken(user.ID, user.Username, hashedRefresh, expiresAt, fingerprint)
+	if err != nil {
+		return "", "", time.Time{}, fmt.Errorf("failed to insert token into db: %w", err)
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -145,10 +161,10 @@ func (s *Service) Login(email, password string) (string, error) {
 
 	jwtString, err := token.SignedString([]byte(s.jwtSecret))
 	if err != nil {
-		return "", fmt.Errorf("failed to sign jwt: %w", err)
+		return "", "", time.Time{}, fmt.Errorf("failed to sign jwt: %w", err)
 	}
 
-	return jwtString, nil
+	return jwtString, rawRefreshToken, expiresAt, nil
 }
 
 func (s *Service) GetUser(userID int) (models.User, error) {
@@ -249,4 +265,77 @@ func (s *Service) ParseToken(tokenStr string) (*jwt.Token, error) {
 	}, jwt.WithValidMethods([]string{"HS256"}))
 
 	return token, err
+}
+
+func (s *Service) Refresh(refToken, fingerprint string) (bool, string, string, time.Time, error) {
+	hashedToken := hash(refToken)
+
+	token, err := s.repo.GetRefreshToken(hashedToken)
+	if err != nil {
+		log.Printf("failed to get refresh token: %v\n", err)
+		return false, "", "", time.Time{}, fmt.Errorf("failed to get refresh token: %w", err)
+	}
+
+	if token.Revoked {
+		return false, "", "", time.Time{}, nil
+	}
+
+	if token.ExpiresAt.Before(time.Now()) {
+		return false, "", "", time.Time{}, nil
+	}
+
+	if fingerprint != token.Fingerprint {
+		return false, "", "", time.Time{}, nil
+	}
+
+	ok, err := s.repo.RevokeRefreshToken(hashedToken)
+	if err != nil {
+		log.Printf("err revoke refresh token: %v\n", err)
+	}
+	if !ok {
+		return false, "", "", time.Time{}, nil
+	}
+
+	newRawRefresh, err := generateRefreshToken()
+	if err != nil {
+		log.Printf("err generate refresh token: %v\n", err)
+		return false, "", "", time.Time{}, fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	newHashedToken := hash(newRawRefresh)
+	newExpiresAt := time.Now().Add(time.Hour * 24 * 7)
+
+	err = s.repo.InsertToken(token.UserID, token.Username, newHashedToken, newExpiresAt, token.Fingerprint)
+	if err != nil {
+		log.Printf("err insert token: %v\n", err)
+		return false, "", "", time.Time{}, fmt.Errorf("failed to insert refresh token: %w", err)
+	}
+
+	newAccessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": token.Username,
+		"user_id":  token.UserID,
+		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+	})
+
+	jwtString, err := newAccessToken.SignedString([]byte(s.jwtSecret))
+	if err != nil {
+		return false, "", "", time.Time{}, fmt.Errorf("failed to sign jwt: %w", err)
+	}
+
+	return true, jwtString, newRawRefresh, newExpiresAt, nil
+}
+
+func generateRefreshToken() (string, error) {
+	b := make([]byte, 32) // 256 бит
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func hash(token string) string {
+	h := sha256.Sum256([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(h[:])
 }
