@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	_ "net/http/pprof"
 	"playmates/components/connection-manager"
 	"playmates/components/db"
 	"playmates/components/entrypoint"
@@ -10,6 +11,7 @@ import (
 	"playmates/components/playmates/service"
 	"playmates/components/repository"
 	"playmates/components/sealer"
+	"time"
 )
 
 func main() {
@@ -26,6 +28,10 @@ func main() {
 		log.Fatalf("Error connecting to database: %v", err)
 		return
 	}
+
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(time.Hour)
 
 	repository := repository.New(db)
 
