@@ -7,9 +7,9 @@ import (
 
 func (r *Repository) InsertToken(userID int, username, hashedToken string, expiresAt time.Time, fingerprint string) error {
 	_, err := r.db.Exec(`
-		INSERT INTO refresh_tokens (user_id, username, hashed_token, expires_at, fingerprint)
-		VALUES ($1, $2, $3, $4)
-		`, userID, username, hashedToken, expiresAt, fingerprint)
+		INSERT INTO refresh_tokens (user_id, username, token_hash, expires_at, fingerprint, revoked)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		`, userID, username, hashedToken, expiresAt, fingerprint, false)
 	if err != nil {
 		return err
 	}

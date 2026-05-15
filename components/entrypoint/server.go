@@ -13,10 +13,10 @@ func New(handler *handler.Handler) *fiber.App {
 
 	// Добавляем CORS middleware
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "*",                           // Разрешаем запросы только с этого домена
-		AllowMethods:     "GET, POST, PUT, DELETE",      // Разрешенные методы
-		AllowHeaders:     "Content-Type, Authorization", // Разрешенные заголовки
-		AllowCredentials: false,                         // Разрешаем передачу куки и авторизационных заголовков
+		AllowOrigins:     "http://localhost:3000",
+		AllowMethods:     "GET, POST, PUT, DELETE",
+		AllowHeaders:     "Content-Type, Authorization",
+		AllowCredentials: true,
 	}))
 
 	// Routes
@@ -33,11 +33,13 @@ func New(handler *handler.Handler) *fiber.App {
 
 	app.Get("/profile/:id", handler.AuthMiddleware, handler.GetProfileById)
 
-	app.Get("/connection-manager/:id", handler.AuthMiddleware, handler.GetChatMessages)
+	app.Get("/chat/:id", handler.AuthMiddleware, handler.GetChatMessages)
 
 	app.Get("/ws/", websocket.New(handler.WebSocketConnect))
 
 	app.Get("/messages", handler.AuthMiddleware, handler.GetMessages)
+
+	app.Post("/refresh", handler.Refresh)
 
 	return app
 }

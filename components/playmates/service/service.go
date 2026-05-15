@@ -156,7 +156,7 @@ func (s *Service) Login(email, password, fingerprint string) (string, string, ti
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": user.Username,
 		"user_id":  user.ID,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"exp":      time.Now().Add(time.Minute * 60).Unix(),
 	})
 
 	jwtString, err := token.SignedString([]byte(s.jwtSecret))
@@ -208,7 +208,7 @@ func (s *Service) GetMessages(currentUserID, otherUserID int) ([]models.Message,
 		return nil, err
 	}
 
-	msgs := make([]models.Message, 0, len(msgsDB))
+	msgs := make([]models.Message, len(msgsDB))
 
 	for i, msg := range msgsDB {
 		decryptedMsg, err := s.sealer.Decrypt(msg.Msg)
@@ -236,7 +236,7 @@ func (s *Service) GetUserChats(userID int) ([]models.ChatPreview, error) {
 		return nil, err
 	}
 
-	chats := make([]models.ChatPreview, 0, len(chatsDB))
+	chats := make([]models.ChatPreview, len(chatsDB))
 
 	for i, chat := range chatsDB {
 		decryptedLastMsg, err := s.sealer.Decrypt(chat.LastMessage)
@@ -314,7 +314,7 @@ func (s *Service) Refresh(refToken, fingerprint string) (bool, string, string, t
 	newAccessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": token.Username,
 		"user_id":  token.UserID,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"exp":      time.Now().Add(time.Minute * 60).Unix(),
 	})
 
 	jwtString, err := newAccessToken.SignedString([]byte(s.jwtSecret))
